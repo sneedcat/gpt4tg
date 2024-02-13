@@ -1,18 +1,21 @@
 # gpt4tg
 This is a fork of [Telegram-Chatbot-Gpt4Free](https://github.com/HexyeDEV/Telegram-Chatbot-Gpt4Free.git), with a few changes.
+
 - Backported some changes from g4f
 - Removed plugins
 - Added tones
 - Added allowed ids
+
 If you want to support the original creator, then go donate to `HexyeDEV`.
 
 # Installation
 Clone the repo
 
 ```git clone https://github.com/sneedcat/gpt4tg```
+
 After that go to the cloned repo directory.
 
-Edit the example.env file with:
+Create an .env file with:
 
 API_ID is your api id from https://my.telegram.org
 
