@@ -7,6 +7,7 @@ import os
 import re
 import io
 import base64
+import time
 import numpy as np
 import uuid
 import urllib.parse
@@ -24,7 +25,7 @@ default_cookies = {
     'KievRPSSecAuth': '',
     'SUID'          : '',
     'SRCHUSR'       : '',
-    'SRCHHPGUSR'    : '',
+    'SRCHHPGUSR'    : f'HV={int(time.time())}',
 }
 
 class Bing():
@@ -237,22 +238,14 @@ class Defaults:
     }
 
     optionsSets = [
-        'nlu_direct_response_filter',
-        'deepleo',
-        'disable_emoji_spoken_text',
-        'responsible_ai_policy_235',
-        'enablemm',
-        'iyxapbing',
-        'iycapbing',
-        'gencontentv3',
-        'fluxsrtrunc',
-        'fluxtrunc',
-        'fluxv1',
-        'rai278',
-        'replaceurl',
-        'eredirecturl',
-        'nojbfedge'
+        'nlu_direct_response_filter', 'deepleo', 'disable_emoji_spoken_text',
+        'responsible_ai_policy_235', 'enablemm', 'iyxapbing', 'iycapbing',
+        'gencontentv3', 'fluxsrtrunc', 'fluxtrunc', 'fluxv1', 'rai278',
+        'replaceurl', 'eredirecturl', 'nojbfedge', "fluxcopilot", "nojbf",
+        "dgencontentv3", "nointernalsugg", "disable_telemetry", "machine_affinity",
+        "streamf", "codeint", "langdtwb", "fdwtlst", "fluxprod", "deuct3"
     ]
+
 
 def format_message(msg: dict) -> str:
     return json.dumps(msg, ensure_ascii=False) + Defaults.delimiter
@@ -369,14 +362,19 @@ def compress_image_to_base64(img, compression_rate) -> str:
     except Exception as e:
         raise e
 
+class ConversationStyleOptionSets():
+    CREATIVE = ["h3imaginative", "clgalileo", "gencontentv3"]
+    BALANCED = ["galileo", "gldcl1p"]
+    PRECISE = ["h3precise", "clgalileo"]
+
 def create_message(conversation: Conversation, prompt: str, tone: str, context: str=None) -> str:
     options_sets = Defaults.optionsSets
     if tone == Tones.creative:
-        options_sets.append("h3imaginative")
+        options_sets.extend(ConversationStyleOptionSets.CREATIVE)
     elif tone == Tones.precise:
-        options_sets.append("h3precise")
+        options_sets.extend(ConversationStyleOptionSets.PRECISE)
     elif tone == Tones.balanced:
-        options_sets.append("galileo")
+        options_sets.extend(ConversationStyleOptionSets.BALANCED)
     else:
         options_sets.append("harmonyv3")
     
@@ -399,6 +397,7 @@ def create_message(conversation: Conversation, prompt: str, tone: str, context: 
                     'requestId': request_id,
                     'messageId': request_id,
                 },
+                "verbosity": "verbose",
                 "scenario": "SERP",
                 'tone': tone,
                 'spokenTextMode': 'None',
