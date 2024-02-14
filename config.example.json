@@ -1,0 +1,8 @@
+{
+    "api_id": "",
+    "api_hash": "",
+    "bot_token": "",
+    "allowed_ids": [],
+    "default_tone": "balanced",
+    "default_role": "dan"
+}

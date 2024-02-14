@@ -163,3 +163,5 @@ cython_debug/
 bot.session
 fly.toml
 .github
+config.json
+chats.db

@@ -5,6 +5,8 @@ This is a fork of [Telegram-Chatbot-Gpt4Free](https://github.com/HexyeDEV/Telegr
 - Removed plugins
 - Added tones
 - Added allowed ids
+- Keeps a track of chosen roles and tones per chat
+
 
 If you want to support the original creator, then go donate to `HexyeDEV`.
 
@@ -15,13 +17,13 @@ Clone the repo
 
 After that go to the cloned repo directory.
 
-Create an .env file with:
+Rename the config.example.json file to config.json and complete with:
 
-API_ID is your api id from https://my.telegram.org
+- api_id is your api id from https://my.telegram.org
 
-API_HASH is your api hash from https://my.telegram.org
+- api_hash is your api hash from https://my.telegram.org
 
-BOT_TOKEN is your bot token from Bot Father
+- bot_token is your bot token from Bot Father
 
 Install all the packages running ```pip install -r requirements.txt```(may change based on your python version, settings and os.)
 
@@ -32,8 +34,6 @@ Enjoy!
 Commands:
 
 - /help - see a command list
-
-- /newrole <Role Name> <Role Info> - create a new role
 
 - /roles - list all the roles
 

@@ -5,31 +5,57 @@ from dotenv import load_dotenv
 from os import getenv
 from bing import Bing, Tones
 import json
-from uuid import uuid4
+import sqlite3
+import db
 
-load_dotenv()
+with open("config.json", "r", encoding="utf-8") as f:
+    data = f.read()
+    config = json.loads(data)
 
-api_id = getenv('API_ID')
-api_hash = getenv('API_HASH')
-bot_token = getenv('BOT_TOKEN')
+try:
+    api_id = config["api_id"]
+    api_hash = config["api_hash"]
+    bot_token = config["bot_token"]
+except:
+    raise Exception('API_ID, API_HASH and BOT_TOKEN must be set in config.json')
 
-# Change this to allow chats (users and channels). Use integers for ids
-allowed_ids = []
+allowed_ids = config["allowed_ids"]
 
 if not api_id or not api_hash or not bot_token:
     raise Exception('API_ID, API_HASH and BOT_TOKEN must be set in .env file')
 
+default_tone = config["default_tone"]
+if default_tone not in ["creative", "precise", "balanced"]:
+    raise Exception("Tone is not in the allowed list.")
+
+with open("roles.json", "r", encoding="utf-8") as f:
+    available_roles = f.read()
+available_roles = json.loads(available_roles)
+
+default_role = config["default_role"]
+if default_role not in available_roles:
+    raise Exception("Add the role in roles.json")
+
+con = sqlite3.connect("chats.db")
+
+db.create_tables(con.cursor())
+for id in allowed_ids:
+    db.Chat.insert_chat(con, id, default_role, default_tone)
+
 client = TelegramClient('bot', api_id, api_hash)
 
-ROLE = ""
-TONE = Tones.creative
-
-async def AiAgent(prompt, system_prompt="", tone=Tones.creative):
+async def AiAgent(prompt, msg, system_prompt="", tone=Tones.creative):
     req = Bing().create_async_generator("gpt-4", [{"content": system_prompt, "role": "system"},{"content": prompt, "role": "user"}], tone=tone)
     full_text = ""
     async for message in req:
         full_text += message
-    return full_text
+        if message != "":
+            try:
+                await msg.edit(full_text)
+            except:
+                pass
+    if full_text == "":
+        await msg.edit("Empty response from Bing")
 
 @client.on(NewMessage(pattern='/start'))
 async def start(event):
@@ -39,70 +65,47 @@ async def start(event):
 async def help(event):
     await event.respond('Hey! Write something and I will answer you using the gpt-4 model or add me to a group and I will answer you when you mention me.\nCommands:\n\n/role - Switches the role (current roles: dan, magician, stan, mongo, devmode, aim)\n\n/newroles - Adds a new role to the role json\n\n/roles - Displays the current roles.\n\n/gpt - Scrapes Bing AI')
 
-@client.on(NewMessage(pattern="/newrole"))
-async def newrole(event):
-    with open("roles.json", "r") as f:
-        roles = f.read()
-    roles = json.loads(roles)
-    try:
-        role_name = event.text.split(" ")[1]
-        role = event.text.split(" ", 2)[2]
-    except IndexError:
-        await event.respond("You need to specify a role name and a role.")
-        return
-    roles[role_name] = role
-    with open("roles.json", "w") as f:
-        f.write(json.dumps(roles))
-    await event.respond("Role added")
-
 @client.on(NewMessage(pattern="/tone"))
 async def tone(event):
-    global TONE
+    global con
+    peer_id = get_peer_id(event.message.peer_id)
     try:
         loc_tone = event.text.split(" ")[1]
     except IndexError:
         await event.respond("You need to specify a role.")
         return
     resp = ""
-    if loc_tone == "creative":
-        TONE = Tones.creative
-        resp = "Tone set to creative"
-    elif loc_tone == "balanced":
-        TONE = Tones.balanced
-        resp = "Tone set to balanaced"
-    elif loc_tone == "precise":
-        TONE = Tones.precise
-        resp = "Tone set to precise"
+    if loc_tone not in ["creative", "balanced", "precise"]:
+        resp = f"Tone set to ${loc_tone}"
+        db.Chat.update_tone(con, peer_id, loc_tone)
     else:
         resp = "Tone isn't available"
     await event.reply(resp)
 
 @client.on(NewMessage(pattern="/roles"))
 async def roles(event):
-    with open("roles.json", "r") as f:
-        roles = f.read()
-    roles = json.loads(roles)
-    await event.respond("Available roles:\n{}".format("\n".join(roles.keys())))
+    global available_roles
+    await event.respond("Available roles:\n{}".format("\n".join(available_roles.keys())))
 
 @client.on(NewMessage(pattern="/role"))
 async def role(event):
-    global ROLE
+    global con
+    if event.text.startswith("/roles"):
+        return
+    peer_id = get_peer_id(event.message.peer_id)
     try:
         loc_role = event.text.split(" ")[1]
     except IndexError:
         await event.respond("You need to specify a role.")
         return
     if loc_role == "disable":
-        ROLE = ""
+        db.Chat.update_role(con, peer_id, None)
         await event.respond("Role disabled")
         return
-    with open("roles.json", "r", encoding="utf-8") as f:
-        roles = f.read()
-    roles = json.loads(roles)
-    try:
-        ROLE = roles[loc_role]
+    elif loc_role in available_roles:
+        db.Chat.update_role(con, peer_id, loc_role)
         await event.respond("Role set")
-    except KeyError:
+    else:
         await event.respond("Role not found")
 
 @client.on(NewMessage(pattern="/gpt"))
@@ -112,19 +115,16 @@ async def gpt(event):
     if peer_id not in allowed_ids:
         await event.reply("Can't respond in this chat.")
         return
+    chat = db.Chat.get_chat(con.cursor(), peer_id)
     my_id = await client.get_me()
     my_id = my_id.id
     my_username = await client.get_me()
     my_username = my_username.username
     prompt = event.text.replace(f'/gpt', '')
     msg = await event.reply('Thinking...')
-    system_prompt = ""
-    if ROLE != "":
-        system_prompt = ROLE
-    result = await AiAgent(prompt, system_prompt, TONE)
-    if result == "":
-        result = "Empty reply from Bing"
-    await msg.edit(result)
+    system_prompt = available_roles[chat.role] if chat.role is not None else ""
+    tone = chat.tone
+    await AiAgent(prompt, msg, system_prompt, tone)
 
 client.start(bot_token=bot_token)
 client.run_until_disconnected()
